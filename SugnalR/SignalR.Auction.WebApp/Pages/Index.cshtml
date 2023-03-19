@@ -1,0 +1,92 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+<div class="text-center">
+    <h1 class="display-4">@Model.PageName</h1>
+    
+    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <table>
+        <thead>
+            <tr>
+                <td>Item</td>
+                <td>Current bid</td>
+                <td></td>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach(var item in Model.Lots)
+            {
+                <tr>
+                    <td>
+                        @Html.DisplayFor(modelItem => item.Name)
+                    </td>
+                    <td>
+                        <span id="@item.Id-bidtext">@item.Bid</span>
+                     </td>
+                     <td>
+                            <input id="@item.Id-input" type="number" name="sum"  value="@item.Bid"/>
+                            <button type="button" onclick="submitBid(@item.Id)">Bid</button>
+                     </td>
+                </tr>    
+            }
+        </tbody>
+    </table>
+</div>
+@section scripts 
+{
+    
+}
+<script src="~/js/signalr/dist/browser/signalr.min.js"></script>
+<script>
+const initializeSignalRConnection = () => 
+{
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/auctionhub", {
+            transport: signalR.HttpTransportType.WebSockets,
+            skipNegotiation: true
+        })
+        .build();
+
+    connection.on("ReceiveNewBid", ({ lotId, bid }) => {
+        console.log("lot: " + lotId + " newBid: " + bid);
+
+        const input = document.getElementById(lotId + "-input");
+
+        const bidText = document.getElementById(lotId + "-bidtext");
+
+         bidText.innerHTML = bid;
+    });
+
+    connection.on("ReceiveNewLot", ({ id, name, bid }) =>
+    {
+         console.log("add new lot: " + id + " name: " + name);
+    });
+
+    connection.start().catch(err => console.error(err.toString()));
+
+    return connection;
+}
+
+const connection = initializeSignalRConnection();
+
+const submitBid = (auctionId) => {
+    const bid = document.getElementById(auctionId + "-input").value;
+    fetch("/auction/" + auctionId + "/newid?currentBid=" + bid, {
+        method: "POST",
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+    //location.reload();
+
+    connection.invoke("NotifyNewBid", {
+        lotId: parseInt(auctionId),
+        bid: parseInt(bid)
+    });
+}
+</script>
+
+
